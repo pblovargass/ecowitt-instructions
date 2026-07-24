@@ -22,8 +22,9 @@ graph TD
 7. Conectarse a la red wifi "GW1XXXX-XXX" y regresar a la aplicación.
 8. Ingresar la señal wifi a la que quiera que se conecte el gateway y la contraseña correspondiente.
     <img width="646" height="641" alt="image" src="https://github.com/user-attachments/assets/07ac615d-5d3a-4d53-8a3c-5ebe31395f1d" />
-10. Si el gateway no detecta automáticamente cada sensor dirigirse a: "Configuración del dispositivo" ---> "ID del sensor". Deberá buscar el tipo de sensor correspondiente y registrar el ID manualmente, este se encontrará en una etiqueta en algún lugar del mismo sensor.
+9. Si el gateway no detecta automáticamente cada sensor dirigirse a: "Configuración del dispositivo" ---> "ID del sensor". Deberá buscar el tipo de sensor correspondiente y registrar el ID manualmente, este se encontrará en una etiqueta en algún lugar del mismo sensor.
     <img width="321" height="653" alt="image" src="https://github.com/user-attachments/assets/0103eac7-d6be-4435-9247-4578786052fe" />
+10. Una vez conectados, los datos obtenidos se mostrarán en la aplicación.
 
 
 
