@@ -38,8 +38,8 @@ if not all([APPLICATION_KEY, API_KEY, MAC]):
         "expórtalas primero en tu terminal (nunca las escribas en el código)."
     )
  
-DATA_DIR = Path("data")
-DATA_DIR.mkdir(exist_ok=True)
+DATA_DIR = Path("data/ecowitt-sj")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 CSV_PATH = DATA_DIR / "ecowitt_data.csv"
 PLOT_PATH = DATA_DIR / "temperatura_humedad.png"
  
