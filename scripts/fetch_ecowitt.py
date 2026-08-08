@@ -38,9 +38,10 @@ if not all([APPLICATION_KEY, API_KEY, MAC]):
         "expórtalas primero en tu terminal (nunca las escribas en el código)."
     )
  
-DATA_DIR = Path("data/ecowitt-sj")
+DATA_DIR = Path("data/ecowitt")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 CSV_PATH = DATA_DIR / "ecowitt_data.csv"
+WIDE_CSV_PATH = DATA_DIR / "ecowitt_data_wide.csv"
 PLOT_PATH = DATA_DIR / "temperatura_humedad.png"
  
 REALTIME_URL = "https://api.ecowitt.net/api/v3/device/real_time"
@@ -52,7 +53,6 @@ AUTH = {
     "mac": MAC,
 }
  
-# Grupos que real_time reporta pero que no son series historicas utiles
 GRUPOS_EXCLUIDOS = {"battery"}
  
  
@@ -177,7 +177,6 @@ def main():
     end_date = datetime.utcnow()
  
     if last_ts is not None:
-        # pequeno solape hacia atras para no perder datos si un run fallo
         start_date = last_ts - timedelta(minutes=10)
     else:
         start_date = end_date - timedelta(hours=LOOKBACK_HOURS)
@@ -214,7 +213,19 @@ def main():
     combined.to_csv(CSV_PATH, index=False)
     print(f"Guardadas {len(new_df)} lecturas nuevas ({len(combined)} filas totales) en {CSV_PATH}")
  
+    update_wide_csv(combined)
     update_plot(combined)
+ 
+ 
+def update_wide_csv(df):
+    """Genera una version 'ancha' del CSV (una columna por variable) solo para
+    lectura/analisis. El CSV largo (ecowitt_data.csv) sigue siendo la fuente de
+    verdad: es el que se usa para deduplicar y seguir agregando datos, porque
+    tolera bien que la estacion cambie de sensores con el tiempo."""
+    pivot = df.pivot_table(index="timestamp", columns="variable", values="value")
+    pivot.sort_index(inplace=True)
+    pivot.to_csv(WIDE_CSV_PATH)
+    print(f"CSV en formato ancho actualizado en {WIDE_CSV_PATH}")
  
  
 def update_plot(df):
