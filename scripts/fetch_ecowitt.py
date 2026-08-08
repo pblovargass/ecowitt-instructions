@@ -32,6 +32,7 @@ APPLICATION_KEY = (os.environ.get("ECOWITT_APPLICATION_KEY") or "").strip()
 API_KEY = (os.environ.get("ECOWITT_API_KEY") or "").strip()
 MAC = (os.environ.get("ECOWITT_MAC") or "").strip()
 LOOKBACK_HOURS = float(os.environ.get("ECOWITT_LOOKBACK_HOURS") or "2")
+BACKFILL_HOURS = float(os.environ.get("ECOWITT_BACKFILL_HOURS") or "24")
 CALLBACK_MANUAL = (os.environ.get("ECOWITT_CALLBACK") or "").strip()
  
 if not all([APPLICATION_KEY, API_KEY, MAC]):
@@ -54,9 +55,9 @@ AUTH = {
     "application_key": APPLICATION_KEY,
     "api_key": API_KEY,
     "mac": MAC,
-    "temp_unitid": 1,  
+    "temp_unitid": 1, 
 }
- 
+
 GRUPOS_EXCLUIDOS = {"battery"}
  
  
@@ -90,8 +91,6 @@ def descubrir_grupos():
  
  
 def flatten(node, prefix, rows):
-    """Recorre el JSON anidado que devuelve Ecowitt y extrae cada serie
-    timestamp -> valor, identificando los bloques que tienen 'list' y 'unit'."""
     if isinstance(node, dict):
         if "list" in node and isinstance(node["list"], dict):
             unit = node.get("unit", "")
@@ -112,12 +111,6 @@ def flatten(node, prefix, rows):
  
  
 def pedir_historico(grupos, start_date, end_date):
-    """Pide el historico a Ecowitt. Intenta con todos los grupos de una vez;
-    si la API lo rechaza, reintenta grupo por grupo para no perder todo por
-    culpa de un solo grupo invalido.
- 
-    Devuelve (rows, ultimo_payload_crudo) -- el payload crudo se usa solo
-    para diagnostico cuando no se encuentran filas."""
     rows = []
     ultimo_payload = None
  
@@ -162,7 +155,6 @@ def pedir_historico(grupos, start_date, end_date):
  
  
 def get_last_timestamp():
-    """Revisa el CSV existente para saber desde cuando pedir datos nuevos."""
     if not CSV_PATH.exists():
         return None
     try:
@@ -179,14 +171,16 @@ def main():
  
     last_ts = get_last_timestamp()
     end_date = datetime.utcnow()
+    inicio_backfill = end_date - timedelta(hours=BACKFILL_HOURS)
  
     if last_ts is not None:
-        # pequeno solape hacia atras para no perder datos si un run fallo
-        start_date = last_ts - timedelta(minutes=10)
+        start_date_anclado = last_ts - timedelta(minutes=10)
+        start_date = min(start_date_anclado, inicio_backfill)
     else:
         start_date = end_date - timedelta(hours=LOOKBACK_HOURS)
  
-    print(f"Pidiendo datos desde {start_date} hasta {end_date} (UTC)")
+    print(f"Pidiendo datos desde {start_date} hasta {end_date} (UTC) "
+          f"[backfill activo: ultimas {BACKFILL_HOURS} h siempre revisadas]")
  
     rows, ultimo_payload = pedir_historico(grupos, start_date, end_date)
  
@@ -223,8 +217,6 @@ def main():
  
  
 def a_hora_local(serie_timestamp_utc):
-    """Convierte una columna de timestamps naive (asumidos UTC) a hora de
-    Chile, respetando el cambio de horario de verano/invierno automaticamente."""
     return (
         serie_timestamp_utc
         .dt.tz_localize("UTC")
@@ -234,11 +226,6 @@ def a_hora_local(serie_timestamp_utc):
  
  
 def update_wide_csv(df):
-    """Genera una version 'ancha' del CSV (una columna por variable) solo para
-    lectura/analisis, indexada en HORA DE CHILE para comparar directo con la
-    app de Ecowitt. El CSV largo (ecowitt_data.csv) sigue siendo la fuente de
-    verdad y se mantiene en UTC: es el que se usa para deduplicar y seguir
-    agregando datos, porque tolera bien que la estacion cambie de sensores."""
     df = df.copy()
     df["timestamp_local"] = a_hora_local(df["timestamp"])
  
