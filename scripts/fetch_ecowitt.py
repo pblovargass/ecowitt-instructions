@@ -1,4 +1,17 @@
 #!/usr/bin/env python3
+"""
+Descarga datos historicos desde la API de Ecowitt y los guarda en un CSV local,
+ademas de actualizar un grafico de temperatura y humedad.
+
+Pensado para correr dentro de un workflow de GitHub Actions con un trigger
+tipo "schedule" (cron), pero tambien funciona corriendolo a mano.
+
+Variables de entorno REQUERIDAS (en GitHub: se configuran como Secrets del repo,
+nunca se escriben directo en este archivo):
+    ECOWITT_APPLICATION_KEY
+    ECOWITT_API_KEY
+    ECOWITT_MAC            -> MAC address de la estacion (formato AA:BB:CC:DD:EE:FF)
+"""
 
 import os
 import sys
@@ -11,10 +24,11 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-APPLICATION_KEY = os.environ.get("ECOWITT_APPLICATION_KEY")
-API_KEY = os.environ.get("ECOWITT_API_KEY")
-MAC = os.environ.get("ECOWITT_MAC")
+APPLICATION_KEY = (os.environ.get("ECOWITT_APPLICATION_KEY") or "").strip()
+API_KEY = (os.environ.get("ECOWITT_API_KEY") or "").strip()
+MAC = (os.environ.get("ECOWITT_MAC") or "").strip()
 LOOKBACK_HOURS = float(os.environ.get("ECOWITT_LOOKBACK_HOURS", "2"))
+CALLBACK_MANUAL = (os.environ.get("ECOWITT_CALLBACK") or "").strip()
 
 if not all([APPLICATION_KEY, API_KEY, MAC]):
     sys.exit(
@@ -28,15 +42,54 @@ DATA_DIR.mkdir(exist_ok=True)
 CSV_PATH = DATA_DIR / "ecowitt_data.csv"
 PLOT_PATH = DATA_DIR / "temperatura_humedad.png"
 
+REALTIME_URL = "https://api.ecowitt.net/api/v3/device/real_time"
 HISTORY_URL = "https://api.ecowitt.net/api/v3/device/history"
+
+AUTH = {
+    "application_key": APPLICATION_KEY,
+    "api_key": API_KEY,
+    "mac": MAC,
+}
+
+# Grupos que real_time reporta pero que no son series historicas utiles
+GRUPOS_EXCLUIDOS = {"battery"}
+
+
+def descubrir_grupos():
+    """Consulta real_time (que si acepta call_back=all) para saber que grupos
+    de sensores reporta esta estacion, y devolverlos como lista."""
+    if CALLBACK_MANUAL:
+        grupos = [g.strip() for g in CALLBACK_MANUAL.split(",") if g.strip()]
+        print(f"Usando grupos definidos manualmente: {grupos}")
+        return grupos
+
+    params = dict(AUTH, call_back="all")
+    resp = requests.get(REALTIME_URL, params=params, timeout=60)
+    resp.raise_for_status()
+    payload = resp.json()
+
+    if payload.get("code") != 0:
+        sys.exit(f"Error consultando real_time: {payload.get('msg')}")
+
+    data = payload.get("data", {}) or {}
+    grupos = [
+        k for k, v in data.items()
+        if isinstance(v, dict) and k not in GRUPOS_EXCLUIDOS
+    ]
+
+    if not grupos:
+        sys.exit("La estacion no reporto ningun grupo de sensores en real_time.")
+
+    print(f"Grupos detectados en la estacion: {grupos}")
+    return grupos
 
 
 def flatten(node, prefix, rows):
     """Recorre el JSON anidado que devuelve Ecowitt y extrae cada serie
     timestamp -> valor, identificando los bloques que tienen 'list' y 'unit'."""
     if isinstance(node, dict):
-        if "list" in node and "unit" in node:
-            unit = node["unit"]
+        if "list" in node and isinstance(node["list"], dict):
+            unit = node.get("unit", "")
             for ts_str, value in node["list"].items():
                 try:
                     rows.append({
@@ -53,6 +106,45 @@ def flatten(node, prefix, rows):
                 flatten(value, new_prefix, rows)
 
 
+def pedir_historico(grupos, start_date, end_date):
+    """Pide el historico a Ecowitt. Intenta con todos los grupos de una vez;
+    si la API lo rechaza, reintenta grupo por grupo para no perder todo por
+    culpa de un solo grupo invalido."""
+    rows = []
+
+    def _consulta(call_back):
+        params = dict(
+            AUTH,
+            call_back=call_back,
+            start_date=start_date.strftime("%Y-%m-%d %H:%M:%S"),
+            end_date=end_date.strftime("%Y-%m-%d %H:%M:%S"),
+            cycle_type="auto",
+        )
+        r = requests.get(HISTORY_URL, params=params, timeout=60)
+        r.raise_for_status()
+        return r.json()
+
+    payload = _consulta(",".join(grupos))
+
+    if payload.get("code") == 0:
+        flatten(payload.get("data", {}) or {}, "", rows)
+        return rows
+
+    print(f"Aviso: la consulta conjunta fallo ({payload.get('msg')}). "
+          f"Reintentando grupo por grupo...")
+
+    for grupo in grupos:
+        p = _consulta(grupo)
+        if p.get("code") != 0:
+            print(f"  - {grupo}: omitido ({p.get('msg')})")
+            continue
+        antes = len(rows)
+        flatten(p.get("data", {}) or {}, "", rows)
+        print(f"  - {grupo}: {len(rows) - antes} lecturas")
+
+    return rows
+
+
 def get_last_timestamp():
     """Revisa el CSV existente para saber desde cuando pedir datos nuevos."""
     if not CSV_PATH.exists():
@@ -67,33 +159,20 @@ def get_last_timestamp():
 
 
 def main():
+    grupos = descubrir_grupos()
+
     last_ts = get_last_timestamp()
     end_date = datetime.utcnow()
 
     if last_ts is not None:
+        # pequeno solape hacia atras para no perder datos si un run fallo
         start_date = last_ts - timedelta(minutes=10)
     else:
         start_date = end_date - timedelta(hours=LOOKBACK_HOURS)
 
-    params = {
-        "application_key": APPLICATION_KEY,
-        "api_key": API_KEY,
-        "mac": MAC,
-        "call_back": "all",
-        "start_date": start_date.strftime("%Y-%m-%d %H:%M:%S"),
-        "end_date": end_date.strftime("%Y-%m-%d %H:%M:%S"),
-        "cycle_type": "auto",
-    }
+    print(f"Pidiendo datos desde {start_date} hasta {end_date} (UTC)")
 
-    resp = requests.get(HISTORY_URL, params=params, timeout=60)
-    resp.raise_for_status()
-    payload = resp.json()
-
-    if payload.get("code") != 0:
-        sys.exit(f"Error de la API de Ecowitt: {payload.get('msg')}")
-
-    rows = []
-    flatten(payload.get("data", {}), "", rows)
+    rows = pedir_historico(grupos, start_date, end_date)
 
     if not rows:
         print("No hay datos nuevos en el rango solicitado.")
@@ -119,6 +198,7 @@ def update_plot(df):
     """Genera/actualiza un grafico simple con las variables de temperatura y humedad."""
     subset = df[df["variable"].str.contains("temperature|humidity", case=False, na=False)]
     if subset.empty:
+        print("No hay variables de temperatura/humedad para graficar.")
         return
 
     pivot = subset.pivot_table(index="timestamp", columns="variable", values="value")
