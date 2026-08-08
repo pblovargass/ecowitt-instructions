@@ -1,27 +1,4 @@
 #!/usr/bin/env python3
-"""
-Descarga datos historicos desde la API de Ecowitt y los guarda en un CSV local,
-ademas de actualizar un grafico de temperatura y humedad.
-
-Pensado para correr dentro de un workflow de GitHub Actions con un trigger
-tipo "schedule" (cron), pero tambien funciona corriendolo a mano.
-
-Variables de entorno REQUERIDAS (en GitHub: se configuran como Secrets del repo,
-nunca se escriben directo en este archivo):
-    ECOWITT_APPLICATION_KEY
-    ECOWITT_API_KEY
-    ECOWITT_MAC            -> MAC address de la estacion (formato AA:BB:CC:DD:EE:FF)
-
-Variable OPCIONAL:
-    ECOWITT_LOOKBACK_HOURS -> cuantas horas hacia atras pedir la primera vez,
-                              si todavia no existe el CSV (default: 2)
-
-Nota sobre huso horario: la API de Ecowitt interpreta start_date/end_date segun
-la config de tu cuenta/estacion. Este script usa UTC (hora del runner de GitHub
-Actions) para armar el rango. La primera vez que lo corras, revisa que las horas
-guardadas en el CSV coincidan con lo esperado; si estan desfasadas, ajusta el
-calculo de start_date/end_date sumando o restando el desfase horario de Chile.
-"""
 
 import os
 import sys
@@ -94,7 +71,6 @@ def main():
     end_date = datetime.utcnow()
 
     if last_ts is not None:
-        # pequeno solape hacia atras para no perder datos si un run fallo
         start_date = last_ts - timedelta(minutes=10)
     else:
         start_date = end_date - timedelta(hours=LOOKBACK_HOURS)
