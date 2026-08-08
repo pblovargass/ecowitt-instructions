@@ -18,12 +18,15 @@ import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
  
 import requests
 import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+ 
+CHILE_TZ = ZoneInfo("America/Santiago")
  
 APPLICATION_KEY = (os.environ.get("ECOWITT_APPLICATION_KEY") or "").strip()
 API_KEY = (os.environ.get("ECOWITT_API_KEY") or "").strip()
@@ -51,7 +54,7 @@ AUTH = {
     "application_key": APPLICATION_KEY,
     "api_key": API_KEY,
     "mac": MAC,
-    "temp_unitid":1,
+    "temp_unitid": 1,  
 }
  
 GRUPOS_EXCLUIDOS = {"battery"}
@@ -178,6 +181,7 @@ def main():
     end_date = datetime.utcnow()
  
     if last_ts is not None:
+        # pequeno solape hacia atras para no perder datos si un run fallo
         start_date = last_ts - timedelta(minutes=10)
     else:
         start_date = end_date - timedelta(hours=LOOKBACK_HOURS)
@@ -218,29 +222,47 @@ def main():
     update_plot(combined)
  
  
+def a_hora_local(serie_timestamp_utc):
+    """Convierte una columna de timestamps naive (asumidos UTC) a hora de
+    Chile, respetando el cambio de horario de verano/invierno automaticamente."""
+    return (
+        serie_timestamp_utc
+        .dt.tz_localize("UTC")
+        .dt.tz_convert(CHILE_TZ)
+        .dt.tz_localize(None)
+    )
+ 
+ 
 def update_wide_csv(df):
     """Genera una version 'ancha' del CSV (una columna por variable) solo para
-    lectura/analisis. El CSV largo (ecowitt_data.csv) sigue siendo la fuente de
-    verdad: es el que se usa para deduplicar y seguir agregando datos, porque
-    tolera bien que la estacion cambie de sensores con el tiempo."""
-    pivot = df.pivot_table(index="timestamp", columns="variable", values="value")
+    lectura/analisis, indexada en HORA DE CHILE para comparar directo con la
+    app de Ecowitt. El CSV largo (ecowitt_data.csv) sigue siendo la fuente de
+    verdad y se mantiene en UTC: es el que se usa para deduplicar y seguir
+    agregando datos, porque tolera bien que la estacion cambie de sensores."""
+    df = df.copy()
+    df["timestamp_local"] = a_hora_local(df["timestamp"])
+ 
+    pivot = df.pivot_table(index="timestamp_local", columns="variable", values="value")
+    pivot.index.name = "timestamp_local (America/Santiago)"
     pivot.sort_index(inplace=True)
     pivot.to_csv(WIDE_CSV_PATH)
-    print(f"CSV en formato ancho actualizado en {WIDE_CSV_PATH}")
+    print(f"CSV en formato ancho actualizado en {WIDE_CSV_PATH} (hora de Chile)")
  
  
 def update_plot(df):
-    """Genera/actualiza un grafico simple con las variables de temperatura y humedad."""
-    subset = df[df["variable"].str.contains("temperature|humidity", case=False, na=False)]
+    """Genera/actualiza un grafico simple con las variables de temperatura y humedad,
+    con el eje temporal en hora de Chile."""
+    subset = df[df["variable"].str.contains("temperature|humidity", case=False, na=False)].copy()
     if subset.empty:
         print("No hay variables de temperatura/humedad para graficar.")
         return
  
-    pivot = subset.pivot_table(index="timestamp", columns="variable", values="value")
+    subset["timestamp_local"] = a_hora_local(subset["timestamp"])
+    pivot = subset.pivot_table(index="timestamp_local", columns="variable", values="value")
  
     fig, ax = plt.subplots(figsize=(12, 6))
     pivot.plot(ax=ax)
-    ax.set_xlabel("Fecha/hora (UTC)")
+    ax.set_xlabel("Fecha/hora (America/Santiago)")
     ax.set_ylabel("Valor")
     ax.set_title("Temperatura y humedad - Estacion Ecowitt")
     ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), fontsize="small")
