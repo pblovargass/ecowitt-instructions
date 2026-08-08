@@ -2,8 +2,8 @@ name: Fetch Ecowitt data
 
 on:
   schedule:
-    - cron: "0 * * * *"   # cada hora, en el minuto 0 (hora UTC)
-  workflow_dispatch: {}     # permite correrlo manualmente desde la pestaña Actions
+    - cron: "0 * * * *"
+  workflow_dispatch: {}
 
 permissions:
   contents: write
