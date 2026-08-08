@@ -1,16 +1,4 @@
 #!/usr/bin/env python3
-"""
-Script de DIAGNOSTICO (temporal).
-
-No descarga datos: solo le pregunta a Ecowitt que dispositivos estan vinculados
-a tu cuenta y muestra la MAC exacta de cada uno, para poder copiarla bien.
-
-Tambien revisa si el Secret ECOWITT_MAC que configuraste coincide con alguno.
-
-Uso: se ejecuta igual que el otro script, desde un workflow de GitHub Actions
-con los mismos Secrets. Una vez resuelto el problema, puedes borrar este archivo.
-"""
-
 import os
 import sys
 import requests
@@ -23,7 +11,6 @@ print("=" * 60)
 print("DIAGNOSTICO DE CREDENCIALES ECOWITT")
 print("=" * 60)
 
-# 1. Revisar que los secrets existan y no tengan espacios raros
 for nombre, valor in [
     ("ECOWITT_APPLICATION_KEY", APPLICATION_KEY),
     ("ECOWITT_API_KEY", API_KEY),
@@ -47,7 +34,6 @@ print("-" * 60)
 if not APPLICATION_KEY or not API_KEY:
     sys.exit("No se puede continuar sin las dos llaves.")
 
-# 2. Preguntar a Ecowitt que dispositivos tiene la cuenta
 url = "https://api.ecowitt.net/api/v3/device/list"
 params = {
     "application_key": APPLICATION_KEY.strip(),
