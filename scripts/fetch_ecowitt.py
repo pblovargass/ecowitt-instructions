@@ -51,6 +51,7 @@ AUTH = {
     "application_key": APPLICATION_KEY,
     "api_key": API_KEY,
     "mac": MAC,
+    "temp_unitid":1,
 }
  
 GRUPOS_EXCLUIDOS = {"battery"}
