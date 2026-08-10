@@ -236,23 +236,32 @@ def update_wide_csv(df):
     print(f"CSV en formato ancho actualizado en {WIDE_CSV_PATH} (hora de Chile)")
  
  
-def update_plot(df):
-    """Genera/actualiza un grafico simple con las variables de temperatura y humedad,
-    con el eje temporal en hora de Chile."""
-    subset = df[df["variable"].str.contains("temperature|humidity", case=False, na=False)].copy()
-    if subset.empty:
-        print("No hay variables de temperatura/humedad para graficar.")
-        return
+VARIABLES_TEMPERATURA = ["indoor.temperature", "temp_ch1.temperature", "temp_ch2.temperature"] # pa separar gráficos en temperatura y humedad
+VARIABLES_HUMEDAD = ["indoor.humidity", "soil_ch1.soilmoisture", "soil_ch2.soilmoisture"] # así se visualiza mejor, cunado estaban juntos no se veía bien x la escala
  
+ 
+def _graficar_panel(ax, df, variables, titulo, ylabel):
+    subset = df[df["variable"].isin(variables)].copy()
+    if subset.empty:
+        ax.set_title(f"{titulo} (sin datos)")
+        return
     subset["timestamp_local"] = a_hora_local(subset["timestamp"])
     pivot = subset.pivot_table(index="timestamp_local", columns="variable", values="value")
- 
-    fig, ax = plt.subplots(figsize=(12, 6))
     pivot.plot(ax=ax)
-    ax.set_xlabel("Fecha/hora (America/Santiago)")
-    ax.set_ylabel("Valor")
-    ax.set_title("Temperatura y humedad - Estacion Ecowitt")
+    ax.set_ylabel(ylabel)
+    ax.set_title(titulo)
     ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), fontsize="small")
+ 
+ 
+def update_plot(df):
+    fig, (ax_temp, ax_hum) = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
+ 
+    _graficar_panel(ax_temp, df, VARIABLES_TEMPERATURA,
+                     "Temperatura - Estacion Ecowitt", "Temperatura (°C)")
+    _graficar_panel(ax_hum, df, VARIABLES_HUMEDAD,
+                     "Humedad - Estacion Ecowitt", "Humedad (%)")
+    
+    ax_hum.set_xlabel("Fecha/hora (America/Santiago)")
     fig.tight_layout()
     fig.savefig(PLOT_PATH, dpi=150)
     plt.close(fig)
