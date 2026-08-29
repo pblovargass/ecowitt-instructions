@@ -101,3 +101,8 @@ El repositorio corre de forma **100% automatizada** gracias a GitHub Actions:
  
 <!-- Se recomienda usar la URL "raw" de GitHub para que la imagen se actualice sola en cada commit -->
 ![Temperatura y Humedad](https://raw.githubusercontent.com/pblovargass/ecowitt-instructions/main/data/ecowitt-sj/temperatura_humedad.png)
+
+---
+
+## Licence
+This project is licensed under the MIT License — see the LICENSE file for details.
