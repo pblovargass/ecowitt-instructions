@@ -241,8 +241,9 @@ def a_hora_local(serie_timestamp_utc):
  
 def update_wide_csv(df):
     df = df.copy()
+    df = df[~df["variable"].str.endswith(("_high", "_low"))]
     df["timestamp_local"] = a_hora_local(df["timestamp"])
- 
+
     pivot = df.pivot_table(index="timestamp_local", columns="variable", values="value")
     pivot.index.name = "timestamp_local (America/Santiago)"
     pivot.sort_index(inplace=True)
