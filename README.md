@@ -24,14 +24,17 @@ graph TD
 2. Descargar en Play Store / App Store la aplicación de ecowitt y registrarse / iniciar sesión.
 3. Dirigirse a la sección de dispositivos y seleccionar "Agregar nuevos dispositivos".
 4. Seleccionar el tipo de estación meteorológica correspondiente.
+
     <img width="722" height="485" alt="image" src="https://github.com/user-attachments/assets/1bc4451d-5af4-4627-b1d5-f37dfbad7516" />
 6. Mantener pulsado el botón central del gateway hasta que la luz parpadee rápidamente.
 7. Conectarse a la red wifi "GW1XXXX-XXX" y regresar a la aplicación.
 8. Ingresar la señal wifi a la que quiera que se conecte el gateway y la contraseña correspondiente.
+
     <img width="646" height="641" alt="image" src="https://github.com/user-attachments/assets/07ac615d-5d3a-4d53-8a3c-5ebe31395f1d" />
-9. Si el gateway no detecta automáticamente cada sensor dirigirse a: "Configuración del dispositivo" ---> "ID del sensor". Deberá buscar el tipo de sensor correspondiente y registrar el ID manualmente, este se encontrará en una etiqueta en algún lugar del mismo sensor.
+10. Si el gateway no detecta automáticamente cada sensor dirigirse a: "Configuración del dispositivo" ---> "ID del sensor". Deberá buscar el tipo de sensor correspondiente y registrar el ID manualmente, este se encontrará en una etiqueta en algún lugar del mismo sensor.
+
     <img width="321" height="653" alt="image" src="https://github.com/user-attachments/assets/0103eac7-d6be-4435-9247-4578786052fe" />
-10. Una vez conectados, los datos obtenidos se mostrarán en la aplicación.
+12. Una vez conectados, los datos obtenidos se mostrarán en la aplicación.
 
 ---
 
@@ -115,11 +118,11 @@ El repositorio corre de forma **100% automatizada** gracias a GitHub Actions:
 | Temperatura | `indoor.temperature`, `temp_ch1.temperature`, `temp_ch2.temperature` | °C |
 | Humedad / Suelo | `indoor.humidity`, `soil_ch1.soilmoisture`, `soil_ch2.soilmoisture` | % |
  
-> ⚠️ Nota: la lista de variables graficadas está fija en el script (`VARIABLES_TEMPERATURA`, `VARIABLES_HUMEDAD`). Si se agregan nuevos sensores (ej. más canales de suelo o temperatura), estas listas deben actualizarse manualmente.
+> Nota: la lista de variables graficadas está fija en el script (`VARIABLES_TEMPERATURA`, `VARIABLES_HUMEDAD`). Si se agregan nuevos sensores (ej. más canales de suelo o temperatura), estas listas deberán actualizarse manualmente.
  
-> ℹ️ Nota sobre `_high`/`_low`: la API a veces entrega variables como `indoor.temperature_high`/`_low` (máximos/mínimos), pero de forma muy esporádica — en la práctica, la inmensa mayoría de las horas no traen ese dato. Por eso se excluyen del CSV ancho (quedarían casi todas las celdas vacías), aunque siguen disponibles crudas en `ecowitt_data.csv` por si se necesitan.
+> Nota sobre `_high`/`_low`: la API a veces entrega variables como `indoor.temperature_high`/`_low` (máximos/mínimos), pero de forma muy esporádica en la práctica, dejando ventanas sin datos. Por eso se excluyen del _CSV wide_ , aunque siguen disponibles en `ecowitt_data.csv` por si se necesitan.
  
-> ℹ️ Nota histórica: hasta agosto de 2026 los datos se guardaban con una lectura cada 5 minutos, lo que hacía crecer `ecowitt_data.csv` muy rápido (varios MB por semana) y con eso también el historial de git, ya que cada corrida commiteaba el archivo completo. Se migró a promedios por hora (reduciendo el volumen ~12x) y todo el histórico existente se convirtió retroactivamente al mismo formato, así que el archivo es uniforme en resolución horaria desde el primer dato disponible.
+> Nota histórica: hasta septiembre 1 de 2026 los datos se guardaban con una lectura cada 5 minutos, lo que hacía crecer `ecowitt_data.csv` muy rápido (varios MB por semana) y con eso también el historial de git, ya que cada corrida "commiteaba" el archivo completo. Se migró a promedios por hora (reduciendo el volumen 12 veces) y todo el histórico existente se convirtió retroactivamente al mismo formato, así que el archivo es uniforme en resolución horaria desde el primer dato disponible.
  
 ### Chart Preview
  
