@@ -32,7 +32,7 @@ APPLICATION_KEY = (os.environ.get("ECOWITT_APPLICATION_KEY") or "").strip()
 API_KEY = (os.environ.get("ECOWITT_API_KEY") or "").strip()
 MAC = (os.environ.get("ECOWITT_MAC") or "").strip()
 LOOKBACK_HOURS = float(os.environ.get("ECOWITT_LOOKBACK_HOURS") or "2")
-BACKFILL_HOURS = float(os.environ.get("ECOWITT_BACKFILL_HOURS") or "24")
+BACKFILL_HOURS = float(os.environ.get("ECOWITT_BACKFILL_HOURS") or "60")
 CALLBACK_MANUAL = (os.environ.get("ECOWITT_CALLBACK") or "").strip()
  
 if not all([APPLICATION_KEY, API_KEY, MAC]):
