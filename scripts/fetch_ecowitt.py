@@ -110,6 +110,18 @@ def flatten(node, prefix, rows):
                 flatten(value, new_prefix, rows)
  
  
+def resample_hourly(df):
+    """Agrupa lecturas de 5 minutos en un promedio por hora (por variable)."""
+    if df.empty:
+        return df
+    df = df.copy()
+    df["timestamp"] = df["timestamp"].dt.floor("h")
+    return (
+        df.groupby(["timestamp", "variable", "unit"], as_index=False, dropna=False)["value"]
+        .mean()
+    )
+
+
 def pedir_historico(grupos, start_date, end_date):
     rows = []
     ultimo_payload = None
@@ -199,18 +211,20 @@ def main():
         print("------------------------------------------------")
         return
  
-    new_df = pd.DataFrame(rows)
- 
+    new_df = resample_hourly(pd.DataFrame(rows))
+
     if CSV_PATH.exists():
         old_df = pd.read_csv(CSV_PATH, parse_dates=["timestamp"])
         combined = pd.concat([old_df, new_df], ignore_index=True)
-        combined.drop_duplicates(subset=["timestamp", "variable"], inplace=True)
+        # keep="last": si una hora ya estaba en el CSV pero esta corrida trajo
+        # lecturas mas completas para esa hora, el promedio nuevo reemplaza al viejo.
+        combined.drop_duplicates(subset=["timestamp", "variable"], keep="last", inplace=True)
     else:
         combined = new_df
- 
+
     combined.sort_values("timestamp", inplace=True)
     combined.to_csv(CSV_PATH, index=False)
-    print(f"Guardadas {len(new_df)} lecturas nuevas ({len(combined)} filas totales) en {CSV_PATH}")
+    print(f"Guardadas {len(new_df)} horas nuevas ({len(combined)} filas totales) en {CSV_PATH}")
  
     update_wide_csv(combined)
     update_plot(combined)
