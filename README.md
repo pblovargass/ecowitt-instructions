@@ -2,6 +2,7 @@
 ![Workflow Status](https://github.com/pblovargass/ecowitt-instructions/actions/workflows/ecowitt_fetch.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Last Commit](https://img.shields.io/github/last-commit/pblovargass/ecowitt-instructions)
  
 > Sistema automatizado de monitoreo microclimático en el campus San Joaquín (UC), orientado a caracterizar la interacción suelo–atmósfera en entornos urbanos mediante sensores EcoWitt.
 
@@ -14,7 +15,7 @@ La interacción entre el cambio climático global y el desarrollo urbano genera 
 graph TD
     A["<b>Factores Globales y Urbanos</b><br/>• Cambio Climático<br/>• Urbanización e Infraestructura"] --> B
     B["<b>Dinámicas Microclimáticas</b><br/>• Perfil Térmico (Varias profundidades)<br/>• Fluctuaciones de Humedad"] --> C
-    C["<b>Medición en Terreno</b><br/>• Sensores EcoWitt<br/>• Sensores Arduíno<br/>• Sensores ---"] --> D
+    C["<b>Medición en Terreno</b><br/>• Sensores EcoWitt<br/>• Sensores Arduíno"] --> D
     D["<b>Flujo de Software (Python)</b><br/>• Toma de datos Automatizada<br/>• Control de Calidad y Filtrado<br/>• Repositorio GitHub"] --> E
     E["<b>Impacto y Ciencia Aplicada</b><br/>• Caracterización Microclimática<br/>• Emisiones de CO₂ y Materia Orgánica"]
 ```
@@ -51,15 +52,16 @@ Implementar un sistema de medición de humedad y temperatura con el fin de recop
 ecowitt-instructions/
 ├── .github/
 │   └── workflows/
-│       └── ecowitt_fetch.yml     # Automatización (GitHub Actions, cron cada 2h)
+│       └── ecowitt_fetch.yml     # Automatización (GitHub Actions, cron cada 48h)
 ├── data/
 │   └── ecowitt-sj/
-│       ├── ecowitt_data.csv          # Datos crudos en formato largo (long)
+│       ├── ecowitt_data.csv          # Datos en formato largo (long), promedio por hora
 │       ├── ecowitt_data_wide.csv     # Datos pivotados en formato ancho (wide), hora local Chile
 │       └── temperatura_humedad.png   # Gráfico actualizado automáticamente
 ├── scripts/
 │   └── fetch_ecowitt.py          # Script principal: descarga, procesa y grafica
 ├── requirements.txt               # Dependencias de Python
+├── .gitignore
 └── README.md
 ```
 
@@ -69,33 +71,55 @@ ecowitt-instructions/
  
 El repositorio corre de forma **100% automatizada** gracias a GitHub Actions:
  
-1. **Disparo (`trigger`)**: el workflow [`ecowitt_fetch.yml`](.github/workflows/ecowitt_fetch.yml) se ejecuta cada 2 horas (`cron: "0 0 */2 * *"`) o manualmente vía `workflow_dispatch`.
-2. **Descarga**: [`fetch_ecowitt.py`](scripts/fetch_ecowitt.py) consulta la API de Ecowitt (`/device/real_time` y `/device/history`), detecta dinámicamente qué grupos de sensores reporta la estación (excluyendo batería) y descarga el historial faltante.
-3. **Backfill inteligente**: cada corrida revisa además las últimas horas (`ECOWITT_BACKFILL_HOURS`, por defecto 24h) para rellenar posibles vacíos si el cron falló o la estación estuvo offline.
-4. **Procesamiento**: los datos se combinan con el CSV existente, se eliminan duplicados (`timestamp` + `variable`) y se guardan en dos formatos:
-   - **Largo** (`ecowitt_data.csv`): una fila por lectura, ideal para análisis y control de calidad.
-   - **Ancho** (`ecowitt_data_wide.csv`): pivotado por variable y convertido a hora local (`America/Santiago`), ideal para graficar o abrir en Excel.
+1. **Disparo (`trigger`)**: el workflow [`ecowitt_fetch.yml`](.github/workflows/ecowitt_fetch.yml) se ejecuta cada 48h (`cron: "0 0 */2 * *"` → días impares del mes a las 00:00 UTC, es decir cada 2 *días*, no cada 2 horas) o manualmente vía `workflow_dispatch`.
+2. **Descarga**: [`fetch_ecowitt.py`](scripts/fetch_ecowitt.py) consulta la API de Ecowitt (`/device/real_time` y `/device/history`), detecta dinámicamente qué grupos de sensores reporta la estación (excluyendo batería) y descarga el historial faltante desde el último timestamp guardado.
+3. **Backfill inteligente**: además de continuar desde el último dato guardado, cada corrida vuelve a revisar una ventana de horas recientes (`ECOWITT_BACKFILL_HOURS`, por defecto 60h) y sobrescribe esas horas si la API entrega valores corregidos o completados retroactivamente (por ejemplo, si la estación estuvo offline y el dato llegó tarde al servidor de Ecowitt).
+4. **Procesamiento**: las lecturas nuevas (que llegan cada ~5 min) se agrupan en un **promedio por hora, por variable**, antes de guardarse. Luego se combinan con el CSV existente, se eliminan duplicados (`timestamp` + `variable`, quedándose con el promedio más reciente si una hora se recalcula) y se guardan en dos formatos:
+   - **Largo** (`ecowitt_data.csv`): una fila por hora y variable, sin filtrar ninguna — incluye todo lo que entrega la API, tal cual.
+   - **Ancho** (`ecowitt_data_wide.csv`): pivotado por variable y convertido a hora local (`America/Santiago`), ideal para graficar o abrir en Excel. Excluye las variables `_high`/`_low` (ver nota en [Data](#data)).
 5. **Visualización**: se regenera automáticamente [`temperatura_humedad.png`](data/ecowitt-sj/temperatura_humedad.png) con dos paneles (temperatura y humedad).
 6. **Commit automático**: si hubo cambios, el bot de GitHub Actions hace commit y push directo a `main`.
+
+### Configuración (variables de entorno)
+
+**Secrets requeridos** (GitHub → Settings → Secrets and variables → Actions):
+
+| Variable | Descripción |
+|---|---|
+| `ECOWITT_APPLICATION_KEY` | Application Key de la cuenta Ecowitt |
+| `ECOWITT_API_KEY` | API Key de la cuenta Ecowitt |
+| `ECOWITT_MAC` | MAC address de la estación (`AA:BB:CC:DD:EE:FF`) |
+
+**Variables opcionales** (ajustables como *Repository variables*, o al correr el script a mano):
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `ECOWITT_LOOKBACK_HOURS` | `2` | Cuántas horas hacia atrás mirar en la **primera** corrida (cuando todavía no existe `ecowitt_data.csv`) |
+| `ECOWITT_BACKFILL_HOURS` | `60` | Ventana que se vuelve a revisar en cada corrida para capturar correcciones tardías de la API |
+| `ECOWITT_CALLBACK` | *(auto)* | Lista de grupos de sensores separados por coma, para forzarla manualmente en vez de auto-detectarla |
 
 ---
 
 ## Data
  
-| Archivo | Formato | Descripción |
-|---|---|---|
-| `ecowitt_data.csv` | Long | Columnas: `timestamp` (UTC), `variable`, `unit`, `value` |
-| `ecowitt_data_wide.csv` | Wide | Índice: `timestamp_local (America/Santiago)`; una columna por variable |
-| `temperatura_humedad.png` | Imagen | Serie de tiempo de temperatura y humedad, actualizada cada corrida |
+| Archivo | Formato | Resolución | Descripción |
+|---|---|---|---|
+| `ecowitt_data.csv` | Long | 1 hora (promedio) | Columnas: `timestamp` (UTC), `variable`, `unit`, `value`. Incluye **todas** las variables que entrega la API, sin filtrar. |
+| `ecowitt_data_wide.csv` | Wide | 1 hora (promedio) | Índice: `timestamp_local (America/Santiago)`; una columna por variable. **No incluye** las variables `_high`/`_low` (ver nota abajo). |
+| `temperatura_humedad.png` | Imagen | — | Serie de tiempo de temperatura y humedad, actualizada cada corrida |
  
 **Variables monitoreadas actualmente:**
  
-| Grupo | Variables |
-|---|---|
-| Temperatura | `indoor.temperature`, `temp_ch1.temperature`, `temp_ch2.temperature` |
-| Humedad / Suelo | `indoor.humidity`, `soil_ch1.soilmoisture`, `soil_ch2.soilmoisture` |
+| Grupo | Variables | Unidad |
+|---|---|---|
+| Temperatura | `indoor.temperature`, `temp_ch1.temperature`, `temp_ch2.temperature` | °C |
+| Humedad / Suelo | `indoor.humidity`, `soil_ch1.soilmoisture`, `soil_ch2.soilmoisture` | % |
  
 > ⚠️ Nota: la lista de variables graficadas está fija en el script (`VARIABLES_TEMPERATURA`, `VARIABLES_HUMEDAD`). Si se agregan nuevos sensores (ej. más canales de suelo o temperatura), estas listas deben actualizarse manualmente.
+ 
+> ℹ️ Nota sobre `_high`/`_low`: la API a veces entrega variables como `indoor.temperature_high`/`_low` (máximos/mínimos), pero de forma muy esporádica — en la práctica, la inmensa mayoría de las horas no traen ese dato. Por eso se excluyen del CSV ancho (quedarían casi todas las celdas vacías), aunque siguen disponibles crudas en `ecowitt_data.csv` por si se necesitan.
+ 
+> ℹ️ Nota histórica: hasta agosto de 2026 los datos se guardaban con una lectura cada 5 minutos, lo que hacía crecer `ecowitt_data.csv` muy rápido (varios MB por semana) y con eso también el historial de git, ya que cada corrida commiteaba el archivo completo. Se migró a promedios por hora (reduciendo el volumen ~12x) y todo el histórico existente se convirtió retroactivamente al mismo formato, así que el archivo es uniforme en resolución horaria desde el primer dato disponible.
  
 ### Chart Preview
  
