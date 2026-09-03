@@ -57,12 +57,19 @@ ecowitt-instructions/
 │   └── workflows/
 │       └── ecowitt_fetch.yml     # Automatización (GitHub Actions, cron cada 48h)
 ├── data/
-│   └── ecowitt-sj/
-│       ├── ecowitt_data.csv          # Datos en formato largo (long), promedio por hora
-│       ├── ecowitt_data_wide.csv     # Datos pivotados en formato ancho (wide), hora local Chile
-│       └── temperatura_humedad.png   # Gráfico actualizado automáticamente
+│   ├── ecowitt-sj/
+│   │   ├── ecowitt_data.csv          # Datos en formato largo (long), promedio por hora
+│   │   ├── ecowitt_data_wide.csv     # Datos pivotados en formato ancho (wide), hora local Chile
+│   │   └── temperatura_humedad.png   # Gráfico actualizado automáticamente
+│   ├── Datos_INIA/
+│   │   ├── datos_2026_INIA-4_TS10_MAX.csv   # Temp. suelo 10cm, máximo diario (INIA La Platina)
+│   │   └── datos_2026_INIA-4_TS10_MIN.csv   # Temp. suelo 10cm, mínimo diario (INIA La Platina)
+│   └── analisis_inia/
+│       ├── comparacion_temp_suelo.csv       # Salida del script de comparación
+│       └── comparacion_temp_suelo.png
 ├── scripts/
-│   └── fetch_ecowitt.py          # Script principal: descarga, procesa y grafica
+│   ├── fetch_ecowitt.py               # Script principal: descarga, procesa y grafica
+│   └── comparar_temp_suelo_inia.py    # Compara temp. de suelo propia vs. INIA
 ├── requirements.txt               # Dependencias de Python
 ├── .gitignore
 └── README.md
@@ -128,6 +135,28 @@ El repositorio corre de forma **100% automatizada** gracias a GitHub Actions:
  
 <!-- Se recomienda usar la URL "raw" de GitHub para que la imagen se actualice sola en cada commit -->
 ![Temperatura y Humedad](https://raw.githubusercontent.com/pblovargass/ecowitt-instructions/main/data/ecowitt-sj/temperatura_humedad.png)
+
+---
+
+## Comparación con INIA
+
+`data/Datos_INIA/` contiene datos externos de la **Red Agrometeorológica de INIA**, estación **La Platina (La Pintana)**: temperatura de suelo a 10cm, máximo y mínimo diario, en huso horario fijo UTC-4.
+
+[`scripts/comparar_temp_suelo_inia.py`](scripts/comparar_temp_suelo_inia.py) cruza esos datos contra los sensores propios de temperatura de suelo:
+
+| Sensor propio | Profundidad | Comparable con INIA |
+|---|---|---|
+| `temp_ch1.temperature` | 10-15cm | Directo (INIA mide a 10cm) |
+| `temp_ch2.temperature` | 20-25cm | Secundario (más profundo, referencia) |
+
+Para cada día en común, calcula el máximo/mínimo propio (agregando los promedios horarios ya guardados) y lo compara contra el de INIA: diferencia promedio (bias), error absoluto medio (MAE) y RMSE. Genera `data/analisis_inia/comparacion_temp_suelo.csv` (detalle día a día) y `comparacion_temp_suelo.png` (gráfico). Para actualizar la comparación con datos más recientes, basta con volver a correr el script.
+
+**Limitaciones a tener en cuenta al leer los resultados:**
+- El máximo/mínimo propio se calcula desde **promedios horarios**, mientras que INIA muestrea de forma continua. Esto genera un sesgo metodológico esperable (los máximos propios salen más bajos, los mínimos más altos que los de INIA) que **no es necesariamente un problema de calibración** del sensor.
+- El traslape de fechas está limitado por cuándo empiezan los datos propios (agosto 2026 en adelante); el archivo de INIA parte antes.
+- La columna `% de datos` de INIA indica qué tan completo estuvo cada día — el script no descarta días incompletos por defecto.
+
+> Los datos de INIA se usan bajo su condición de uso: *"El uso de los datos en publicaciones debe señalar la fuente de los datos y que es una colaboración entre INIA y las instituciones que mantienen convenio con INIA. Adicionalmente, se solicita colocar en un lugar visible el logo de la red agrometeorológica de INIA."*
 
 ---
 
