@@ -151,7 +151,7 @@ El repositorio corre de forma 100% automatizada gracias a GitHub Actions:
 
 Para cada día en común, calcula el máximo/mínimo propio (agregando los promedios horarios ya guardados) y lo compara contra el de INIA. Genera `data/analisis_inia/comparacion_temp_suelo.csv` (detalle día a día) y `comparacion_temp_suelo.png` (gráfico). Para actualizar la comparación con datos más recientes, basta con volver a correr el script.
 
-### Limitaciones a tener en cuenta al leer los resultados
+### Limitations
 - El máximo/mínimo propio se calcula desde promedios horarios, mientras que INIA muestrea de forma continua. Esto genera un sesgo  esperable (los máximos propios salen más bajos, los mínimos más altos que los de INIA) que no es necesariamente un problema de calibración del sensor.
 - El traslape de fechas está limitado por cuándo empiezan los datos propios (agosto 2026 en adelante), el archivo de INIA parte antes.
 - La columna `% de datos` de INIA indica el porcentaje de datos diarios, el script no descarta días incompletos por defecto.
