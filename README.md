@@ -40,10 +40,10 @@ graph TD
 
 ## Objectives
  
-**Objetivo general**
+#### Objetivo general
 Implementar un sistema de medición de humedad y temperatura con el fin de recopilar datos ambientales en el campus San Joaquín.
  
-**Objetivos específicos**
+#### Objetivos específicos
 1. Testear sensores de temperatura en el campus San Joaquín.
 2. Analizar datos y comparar sensores.
 
@@ -79,12 +79,12 @@ ecowitt-instructions/
 
 ## How the Pipeline Works
  
-El repositorio corre de forma **100% automatizada** gracias a GitHub Actions:
+El repositorio corre de forma 100% automatizada gracias a GitHub Actions:
  
 1. **Disparo (`trigger`)**: el workflow [`ecowitt_fetch.yml`](.github/workflows/ecowitt_fetch.yml) se ejecuta cada 48h (`cron: "0 0 */2 * *"` → días impares del mes a las 00:00 UTC, es decir cada 2 *días*, no cada 2 horas) o manualmente vía `workflow_dispatch`.
 2. **Descarga**: [`fetch_ecowitt.py`](scripts/fetch_ecowitt.py) consulta la API de Ecowitt (`/device/real_time` y `/device/history`), detecta dinámicamente qué grupos de sensores reporta la estación (excluyendo batería) y descarga el historial faltante desde el último timestamp guardado.
 3. **Backfill inteligente**: además de continuar desde el último dato guardado, cada corrida vuelve a revisar una ventana de horas recientes (`ECOWITT_BACKFILL_HOURS`, por defecto 60h) y sobrescribe esas horas si la API entrega valores corregidos o completados retroactivamente (por ejemplo, si la estación estuvo offline y el dato llegó tarde al servidor de Ecowitt).
-4. **Procesamiento**: las lecturas nuevas (que llegan cada ~5 min) se agrupan en un **promedio por hora, por variable**, antes de guardarse. Luego se combinan con el CSV existente, se eliminan duplicados (`timestamp` + `variable`, quedándose con el promedio más reciente si una hora se recalcula) y se guardan en dos formatos:
+4. **Procesamiento**: las lecturas nuevas (que llegan cada ~5 min) se agrupan en un promedio por hora, por variable, antes de guardarse. Luego se combinan con el CSV existente, se eliminan duplicados (`timestamp` + `variable`, quedándose con el promedio más reciente si una hora se recalcula) y se guardan en dos formatos:
    - **Largo** (`ecowitt_data.csv`): una fila por hora y variable, sin filtrar ninguna — incluye todo lo que entrega la API, tal cual.
    - **Ancho** (`ecowitt_data_wide.csv`): pivotado por variable y convertido a hora local (`America/Santiago`), ideal para graficar o abrir en Excel. Excluye las variables `_high`/`_low` (ver nota en [Data](#data)).
 5. **Visualización**: se regenera automáticamente [`temperatura_humedad.png`](data/ecowitt-sj/temperatura_humedad.png) con dos paneles (temperatura y humedad).
@@ -104,7 +104,7 @@ El repositorio corre de forma **100% automatizada** gracias a GitHub Actions:
 
 | Variable | Default | Descripción |
 |---|---|---|
-| `ECOWITT_LOOKBACK_HOURS` | `2` | Cuántas horas hacia atrás mirar en la **primera** corrida (cuando todavía no existe `ecowitt_data.csv`) |
+| `ECOWITT_LOOKBACK_HOURS` | `2` | Cuántas horas hacia atrás mirar en la primera corrida (cuando todavía no existe `ecowitt_data.csv`) |
 | `ECOWITT_BACKFILL_HOURS` | `60` | Ventana que se vuelve a revisar en cada corrida para capturar correcciones tardías de la API |
 | `ECOWITT_CALLBACK` | *(auto)* | Lista de grupos de sensores separados por coma, para forzarla manualmente en vez de auto-detectarla |
 
@@ -114,11 +114,11 @@ El repositorio corre de forma **100% automatizada** gracias a GitHub Actions:
  
 | Archivo | Formato | Resolución | Descripción |
 |---|---|---|---|
-| `ecowitt_data.csv` | Long | 1 hora (promedio) | Columnas: `timestamp` (UTC), `variable`, `unit`, `value`. Incluye **todas** las variables que entrega la API, sin filtrar. |
-| `ecowitt_data_wide.csv` | Wide | 1 hora (promedio) | Índice: `timestamp_local (America/Santiago)`; una columna por variable. **No incluye** las variables `_high`/`_low` (ver nota abajo). |
+| `ecowitt_data.csv` | Long | 1 hora (promedio) | Columnas: `timestamp` (UTC), `variable`, `unit`, `value`. Incluye todas las variables que entrega la API, sin filtrar. |
+| `ecowitt_data_wide.csv` | Wide | 1 hora (promedio) | Índice: `timestamp_local (America/Santiago)`; una columna por variable. No incluye las variables `_high`/`_low` (ver nota abajo). |
 | `temperatura_humedad.png` | Imagen | — | Serie de tiempo de temperatura y humedad, actualizada cada corrida |
  
-**Variables monitoreadas actualmente:**
+### Variables monitoreadas actualmente:
  
 | Grupo | Variables | Unidad |
 |---|---|---|
@@ -138,9 +138,9 @@ El repositorio corre de forma **100% automatizada** gracias a GitHub Actions:
 
 ---
 
-## Comparación con INIA
+## Comparation with INA
 
-`data/Datos_INIA/` contiene datos externos de la **Red Agrometeorológica de INIA**, estación **La Platina (La Pintana)**: temperatura de suelo a 10cm, máximo y mínimo diario, en huso horario fijo UTC-4.
+`data/Datos_INIA/` contiene datos externos de la Red Agrometeorológica de INIA estación La Platina (La Pintana): temperatura de suelo a 10cm, máximo y mínimo diario.
 
 [`scripts/comparar_temp_suelo_inia.py`](scripts/comparar_temp_suelo_inia.py) cruza esos datos contra los sensores propios de temperatura de suelo:
 
@@ -149,14 +149,12 @@ El repositorio corre de forma **100% automatizada** gracias a GitHub Actions:
 | `temp_ch1.temperature` | 10-15cm | Directo (INIA mide a 10cm) |
 | `temp_ch2.temperature` | 20-25cm | Secundario (más profundo, referencia) |
 
-Para cada día en común, calcula el máximo/mínimo propio (agregando los promedios horarios ya guardados) y lo compara contra el de INIA: diferencia promedio (bias), error absoluto medio (MAE) y RMSE. Genera `data/analisis_inia/comparacion_temp_suelo.csv` (detalle día a día) y `comparacion_temp_suelo.png` (gráfico). Para actualizar la comparación con datos más recientes, basta con volver a correr el script.
+Para cada día en común, calcula el máximo/mínimo propio (agregando los promedios horarios ya guardados) y lo compara contra el de INIA. Genera `data/analisis_inia/comparacion_temp_suelo.csv` (detalle día a día) y `comparacion_temp_suelo.png` (gráfico). Para actualizar la comparación con datos más recientes, basta con volver a correr el script.
 
-**Limitaciones a tener en cuenta al leer los resultados:**
-- El máximo/mínimo propio se calcula desde **promedios horarios**, mientras que INIA muestrea de forma continua. Esto genera un sesgo metodológico esperable (los máximos propios salen más bajos, los mínimos más altos que los de INIA) que **no es necesariamente un problema de calibración** del sensor.
-- El traslape de fechas está limitado por cuándo empiezan los datos propios (agosto 2026 en adelante); el archivo de INIA parte antes.
-- La columna `% de datos` de INIA indica qué tan completo estuvo cada día — el script no descarta días incompletos por defecto.
-
-> Los datos de INIA se usan bajo su condición de uso: *"El uso de los datos en publicaciones debe señalar la fuente de los datos y que es una colaboración entre INIA y las instituciones que mantienen convenio con INIA. Adicionalmente, se solicita colocar en un lugar visible el logo de la red agrometeorológica de INIA."*
+### Limitaciones a tener en cuenta al leer los resultados
+- El máximo/mínimo propio se calcula desde promedios horarios, mientras que INIA muestrea de forma continua. Esto genera un sesgo  esperable (los máximos propios salen más bajos, los mínimos más altos que los de INIA) que no es necesariamente un problema de calibración del sensor.
+- El traslape de fechas está limitado por cuándo empiezan los datos propios (agosto 2026 en adelante), el archivo de INIA parte antes.
+- La columna `% de datos` de INIA indica el porcentaje de datos diarios, el script no descarta días incompletos por defecto.
 
 ---
 
