@@ -19,7 +19,7 @@ graph TD
     D["<b>Flujo de Software (Python)</b><br/>• Toma de datos Automatizada<br/>• Control de Calidad y Filtrado<br/>• Repositorio GitHub"] --> E
     E["<b>Impacto y Ciencia Aplicada</b><br/>• Caracterización Microclimática<br/>• Emisiones de CO₂ y Materia Orgánica"]
 ```
-### How to use ecowitt sensors
+### Cómo instalar los sensores ecowitt
 1. En primer lugar, se debe conectar el gateway GW1100 a la corriente por medio de un adaptador usb, no de manera directa a la fuente de poder.
 2. Descargar en Play Store / App Store la aplicación de ecowitt y registrarse / iniciar sesión.
 3. Dirigirse a la sección de dispositivos y seleccionar "Agregar nuevos dispositivos".
@@ -55,7 +55,7 @@ Implementar un sistema de medición de humedad y temperatura con el fin de recop
 ecowitt-instructions/
 ├── .github/
 │   └── workflows/
-│       └── ecowitt_fetch.yml     # Automatización (GitHub Actions, cron cada 48h)
+│       └── ecowitt_fetch.yml     # Automatización con GitHub Actions, cron cada 48h
 ├── data/
 │   ├── ecowitt-sj/
 │   │   ├── ecowitt_data.csv          # Datos en formato largo (long), promedio por hora
@@ -131,7 +131,7 @@ El repositorio corre de forma 100% automatizada gracias a GitHub Actions:
  
 > Nota histórica: hasta septiembre 1 de 2026 los datos se guardaban con una lectura cada 5 minutos, lo que hacía crecer `ecowitt_data.csv` muy rápido (varios MB por semana) y con eso también el historial de git, ya que cada corrida "commiteaba" el archivo completo. Se migró a promedios por hora (reduciendo el volumen 12 veces) y todo el histórico existente se convirtió retroactivamente al mismo formato, así que el archivo es uniforme en resolución horaria desde el primer dato disponible.
  
-### Chart Preview
+### Preview de datos
  
 <!-- Se recomienda usar la URL "raw" de GitHub para que la imagen se actualice sola en cada commit -->
 ![Temperatura y Humedad](https://raw.githubusercontent.com/pblovargass/ecowitt-instructions/main/data/ecowitt-sj/temperatura_humedad.png)
@@ -151,7 +151,9 @@ El repositorio corre de forma 100% automatizada gracias a GitHub Actions:
 
 Para cada día en común, calcula el máximo/mínimo propio (agregando los promedios horarios ya guardados) y lo compara contra el de INIA. Genera `data/analisis_inia/comparacion_temp_suelo.csv` (detalle día a día) y `comparacion_temp_suelo.png` (gráfico). Para actualizar la comparación con datos más recientes, basta con volver a correr el script.
 
-### Limitations
+![Compoaración con INA](https://raw.githubusercontent.com/pblovargass/ecowitt-instructions/main/data/analisis_inia/comparacion_temp_suelo.png)
+
+### Limitaciones
 - El máximo/mínimo propio se calcula desde promedios horarios, mientras que INIA muestrea de forma continua. Esto genera un sesgo  esperable (los máximos propios salen más bajos, los mínimos más altos que los de INIA) que no es necesariamente un problema de calibración del sensor.
 - El traslape de fechas está limitado por cuándo empiezan los datos propios (agosto 2026 en adelante), el archivo de INIA parte antes.
 - La columna `% de datos` de INIA indica el porcentaje de datos diarios, el script no descarta días incompletos por defecto.
